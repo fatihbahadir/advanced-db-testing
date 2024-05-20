@@ -97,6 +97,13 @@ class App:
         self._is_app_running = True
         self._app_status = ApplicationStatus.IDLE
 
+        DbConnector.setup(
+            dbname="AdventureWorks2012",
+            user="fatih",
+            password="123456",
+            host="'HPPOMEN\SQLEXPRESS"
+        )
+
         self._screen = Screen(app=self,
                               geometry="400x400",
                               title="Form")

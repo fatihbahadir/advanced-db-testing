@@ -51,7 +51,7 @@ class WorkerManager(IWorkerManager):
 
     def initialize(self):
         self._clear_threads()
-        for _ in self.worker_amount:
+        for _ in range(self.worker_amount):
             self._threads.append(StoppableThread(target=self.job))
 
     def start(self):

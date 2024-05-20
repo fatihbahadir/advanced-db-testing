@@ -18,7 +18,7 @@ class DbConnector:
     _logger = Logger(__name__).get_logger()
 
     @classmethod
-    def setup(cls, dbname: str, user: str, password: str, host: str, port: str) -> None:
+    def setup(cls, dbname: str, user: str, password: str, host: str) -> None:
         cls._dbname = dbname
         cls._user = user
         cls._password = password
@@ -61,4 +61,4 @@ class DbConnector:
     
     @classmethod
     def _gen_conn_str(cls):
-        f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={cls.server};DATABASE={cls.database};UID={cls.username};PWD={cls.password}'
+        return f'DRIVER={{SQL Server}};SERVER={cls._host};DATABASE={cls._dbname};UID={cls._user};PWD={cls._password}'
