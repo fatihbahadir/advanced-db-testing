@@ -47,4 +47,12 @@ class FormPage(customtkinter.CTkFrame, BasePage):
             TransactionIsolationLevel.from_value(self.select_box.get_selected_option()),
             self.checkbox.get_value() == "True"
         )
+        self._clear_form()
         self.switch_frame_callback()
+
+
+    def _clear_form(self):
+        self.input_a.input.delete(0, customtkinter.END)  
+        self.input_b.input.delete(0, customtkinter.END)  
+        self.select_box.selected_option.set("read uncommitted")
+        self.checkbox.variable.set("True")

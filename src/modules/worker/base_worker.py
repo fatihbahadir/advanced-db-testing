@@ -1,23 +1,15 @@
 
 import psycopg2
 from psycopg2.extensions import connection, cursor
-from threading import Thread, get_ident
 
 from abc import ABC, abstractmethod
 
 from typing import List, Tuple
 
 from core.app_logger import Logger
+from core.utils.thread_utils import StoppableThread
 
 class IWorkerManager(ABC):
-
-    @abstractmethod
-    def connect(self) -> Tuple[connection, cursor]:
-        """Connect to database"""
-
-    @abstractmethod
-    def disconnect(self, conn_data: Tuple[connection, cursor]) -> None:
-        """Disconnect from database"""
 
     @abstractmethod
     def initialize(self):
@@ -26,6 +18,10 @@ class IWorkerManager(ABC):
     @abstractmethod
     def start(self):
         """Start executing threads job()'s"""
+
+    @abstractmethod
+    def stop(self):
+        """Stop executing remain jobs"""
 
     @abstractmethod
     def job(self):
@@ -39,14 +35,17 @@ class WorkerManager(IWorkerManager):
                  worker_amount: int,
                  connection_params: dict,
                  increment_complete: callable,
-                 increment_deadlock: callable) -> None:
+                 increment_deadlock: callable,
+                 set_average: callable) -> None:
         self.worker_amount = worker_amount
         self.connection_params = connection_params
         self.increment_complete = increment_complete
         self.increment_deadlock = increment_deadlock
+        self.set_average = set_average
 
-        self._threads: List[Thread] = []
+        self._threads: List[StoppableThread] = []
 
+        self.total_elapsed_time_per_worker: float = 0.0
         self.number_of_deadlocks = 0
 
         self.job_query = None
@@ -55,36 +54,23 @@ class WorkerManager(IWorkerManager):
         self._clear_threads()
         self._logger.debug(f"{self.__class__.__name__} destroyed")
 
-    def connect(self) -> Tuple[connection, cursor]:
-        try:
-            conn = psycopg2.connect(**self.connection_params)
-            cursor = self.db_conn.cursor()
-        except psycopg2.Error as e:
-            self._logger.error("DB connection error: " + e)
-            raise
-        self._logger.debug(f"DB connection successful (thread::{get_ident()})")
-        return (conn, cursor)
-
-    def disconnect(self, conn_data: Tuple[connection, cursor]) -> None:
-        conn, cursor = conn_data
-        if cursor:
-            cursor.close()
-            cursor = None
-            self._logger.debug(f"DB cursor closed (thread::{get_ident()})")
-        if conn:
-            conn.close()
-            conn = None
-            self._logger.debug(f"DB conn closed (thread::{get_ident()})")
-
     def initialize(self):
         self._clear_threads()
         for _ in self.worker_amount:
-            self._threads.append(Thread(target=self.job))
+            self._threads.append(StoppableThread(target=self.job))
 
     def start(self):
+        self.initialize()
+
         if self._threads:
             for t in self._threads:
                 t.start()
+
+    def stop(self):
+        for t in self._threads:
+            t.stop()
+        for t in self._threads:
+            t.join()
 
     def job(self):
         raise NotImplementedError(f"{self.__class__.__name__}.job() not implemented")
@@ -97,3 +83,13 @@ class WorkerManager(IWorkerManager):
             self._logger.debug(f"Thread ({t.getName()}) joined")
         self._threads = []
         self._logger.debug("self._threads cleared")
+
+    def _update_ui(self):
+
+        self.set_average(round(self.total_elapsed_time_per_worker / self.worker_amount , 2))
+        self.increment_complete()
+
+    def _deadlock_occured(self):
+
+        self.number_of_deadlocks +=  1
+        self.increment_deadlock()

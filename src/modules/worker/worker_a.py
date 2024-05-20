@@ -2,10 +2,13 @@
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import cursor
-from threading import get_ident
+from threading import Event, get_ident
 from random import random
+import time
 
 from modules.worker.base_worker import WorkerManager
+
+from services.db_connector import DbConnector
 
 class AWorkerManager(WorkerManager):
 
@@ -13,8 +16,9 @@ class AWorkerManager(WorkerManager):
                  worker_amount: int, 
                  connection_params: dict,
                  increment_complete: callable,
-                 increment_deadlock: callable) -> None:
-        super().__init__(worker_amount, connection_params, increment_complete, increment_deadlock)
+                 increment_deadlock: callable,
+                 set_average: callable) -> None:
+        super().__init__(worker_amount, connection_params, increment_complete, increment_deadlock, set_average)
 
         self.job_query = sql.SQL("""UPDATE Sales.SalesOrderDetail
                                 SET UnitPrice = UnitPrice * 10.0 / 10.0
@@ -26,23 +30,29 @@ class AWorkerManager(WorkerManager):
                                 BETWEEN @BeginDate AND @EndDate
                                 AND Sales.SalesOrderHeader.OnlineOrderFlag = 1)""")
     
-    def job(self):
+    def job(self, stop_event: Event):
+
+        _start_time = time.time()
 
         for _ in range(100):
+            if (stop_event.is_set()): break
 
-            conn, cursor = self.connect()
-
+            conn, cursor = DbConnector.connect()
             try:
                 self._random_execute(cursor)
             except psycopg2.Error as e:
                 self._logger.debug("DB error [worker#a]: " + e)
                 if e.args[0] == 40001 or "deadlock" in e.args[1].lower():
                     self._logger.warn(f"DB deadlock [worker#a] (thread::{get_ident()})")
-                    self.increment_deadlock()
+            
+                    self._deadlock_occurred()
+            
+            DbConnector.disconnect(conn_data=(conn, cursor))
 
-            self.disconnect(conn_data=(conn, cursor))
+        _end_time = time.time()
+        self.total_elapsed_time_per_worker += _end_time - _start_time
 
-        self.increment_complete()
+        self._update_ui()
 
     def _random_execute(self, cursor: cursor):
 

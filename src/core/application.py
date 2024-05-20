@@ -1,12 +1,14 @@
-from threading import Thread
+
 from datetime import datetime
 import time
 from random import random
+from threading import Event
 
 from modules.screen.screen import Screen
 from modules.screen.enums import ScreenStatus
 from core.app_enums import ApplicationStatus
 from core.app_logger import Logger
+from core.utils.thread_utils import StoppableThread
 
 from modules.worker.enums import TransactionIsolationLevel
 from services.db_connector import DbConnector
@@ -25,7 +27,10 @@ class App:
 
     _logger = Logger(__name__).get_logger()
 
-    curr_simulation_meta = {}
+    form_data = {}
+
+    a_worker_manager = None
+    b_worker_manager = None
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -38,11 +43,15 @@ class App:
 
     def stop(self):
         self._is_app_running = False
+        self._app_status = ApplicationStatus.CLOSING
+
+        self._app_cycle_thread.stop()
         self._app_cycle_thread.join()
 
-        self._simulation_thread.join()
+        if self._simulation_thread:
+            self._simulation_thread.join()
 
-        self._screen.stop()
+        self._screen.destroy()
 
     def info(self):
         self._logger.info("\n$ App Info ~ " + str(datetime.now()))
@@ -55,21 +64,25 @@ class App:
             self._logger.warn("App status must be IDLE to start simulation. current: " + self._app_status.name)
             return
 
-        if self._screen._screen_status != ScreenStatus.IDLE:
+        if self._screen._screen_status != ScreenStatus.BLOCKED:
             self._logger.warn("Screen status must be IDLE to start simulation. current: " + self._screen._screen_status.name)
 
-        self._set_simulation_meta(a_amount, b_amount, level, is_indexed)
-        self._screen.callbacks["set_initial_params"](self.curr_simulation_meta)
+        self._set_simulation_form_data(a_amount, b_amount, level, is_indexed)
+        self._screen.callbacks["set_initial_params"](self.form_data)
         self._screen.switch_dashboard()
 
         self._start_simulation()
 
     def refresh(self):
-        pass
+
+        self.form_data = {}
+
+        self.a_worker_manager = None
+        self.b_worker_manager = None
 
     def panic(self):
         self._logger.warn("System panicked!!")
-        self.stop()
+        self._app_status = ApplicationStatus.CRASHED
 
     def _initialize(self):
         self._is_app_running = True
@@ -78,23 +91,19 @@ class App:
         self._screen = Screen(app=self,
                               geometry="400x400",
                               title="Form")
-        self._app_cycle_thread = Thread(target=self._run_cycle_thread, daemon=True)
+        self._app_cycle_thread = StoppableThread(target=self._run_cycle_thread, daemon=True)
         self._app_cycle_thread.start()
 
-    def _run_cycle_thread(self):
+    def _run_cycle_thread(self, stop_event: Event):
 
-        health_counter = 0
         while self._is_app_running:
-            
-            if (health_counter > 5):
-                self.stop()
 
             self.info()
             self._health_check()
-            
-            health_counter += 1
-            print(f"Health Check: {health_counter}/5")
-            time.sleep(10)
+
+            for _ in range(30):
+                if stop_event.is_set(): break
+                time.sleep(1)
 
     def _health_check(self):
 
@@ -112,8 +121,8 @@ class App:
         if isinstance(status, ApplicationStatus):
             self._app_status = status
 
-    def _set_simulation_meta(self, a_amount: int, b_amount: int, level: TransactionIsolationLevel, is_indexed: bool) -> None:
-        self.curr_simulation_meta = {
+    def _set_simulation_form_data(self, a_amount: int, b_amount: int, level: TransactionIsolationLevel, is_indexed: bool) -> None:
+        self.form_data = {
             "a_amount": a_amount,
             "b_amount": b_amount,
             "level": level,
@@ -125,26 +134,31 @@ class App:
             self._logger.warn("Application can not execute two simulation simultaneously")
             return
         
-        self._simulation_thread = Thread(target=self._simulate)
+        self._simulation_thread = StoppableThread(target=self._simulate)
         self._simulation_thread.start()
 
-    def _simulate(self):
+    def _simulate(self, stop_event: Event):
         
         self._app_status = ApplicationStatus.RUNNING
 
         ##### worker setup
         for _ in range(10):
+
+            if stop_event.is_set(): break
+
             self._screen.callbacks["increment_a_completed"]()
             time.sleep(random()*3)
         #####
+
+        # This should remove the progressbar and add buttons
+        self._screen.callbacks["remove_progress_bar"]()
 
         self._stop_simulation()
 
     def _stop_simulation(self):
         
-        self._simulation_thread.join()
         self._simulation_thread = None
 
-        # self._screen.simulate_result()
+        # self._screen.simulate_result()
 
         self._app_status = ApplicationStatus.IDLE

@@ -2,10 +2,12 @@
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import cursor
-from threading import get_ident
+from threading import get_ident, Event
 from random import random
+import time
 
 from modules.worker.base_worker import WorkerManager
+from services.db_connector import DbConnector
 
 class BWorkerManager(WorkerManager):
 
@@ -13,16 +15,28 @@ class BWorkerManager(WorkerManager):
                  worker_amount: int, 
                  connection_params: dict,
                  increment_complete: callable,
-                 increment_deadlock: callable) -> None:
-        super().__init__(worker_amount, connection_params, increment_complete, increment_deadlock)
+                 increment_deadlock: callable,
+                 set_average: callable) -> None:
+        super().__init__(worker_amount, connection_params, increment_complete, increment_deadlock, set_average)
 
-        self.job_query = sql.SQL(""" """)
+        self.job_query = sql.SQL("""SELECT SUM(Sales.SalesOrderDetail.OrderQty)
+                                FROM Sales.SalesOrderDetail
+                                WHERE UnitPrice > 100
+                                AND EXISTS (SELECT * FROM Sales.SalesOrderHeader
+                                WHERE Sales.SalesOrderHeader.SalesOrderID =
+                                Sales.SalesOrderDetail.SalesOrderID
+                                AND Sales.SalesOrderHeader.OrderDate
+                                BETWEEN @BeginDate AND @EndDate
+                                AND Sales.SalesOrderHeader.OnlineOrderFlag = 1)""")
 
-    def job(self):
+    def job(self, stop_event: Event):
+
+        _start_time = time.time()
 
         for _ in range(100):
+            if (stop_event.is_set()): break
 
-            conn, cursor = self.connect()
+            conn, cursor = DbConnector.connect()
 
             try:
                 self._random_execute(cursor)
@@ -30,11 +44,15 @@ class BWorkerManager(WorkerManager):
                 self._logger.debug("DB error [worker#b]: " + e)
                 if e.args[0] == 40001 or "deadlock" in e.args[1].lower():
                     self._logger.warn(f"DB deadlock [worker#b] (thread::{get_ident()})")
-                    self.increment_deadlock()
+                    
+                    self._deadlock_occured()
 
-            self.disconnect(conn_data=(conn, cursor))
+            DbConnector.disconnect(conn_data=(conn, cursor))
 
-        self.increment_complete()
+        _end_time = time.time()
+        self.total_elapsed_time_per_worker += _end_time - _start_time
+        
+        self._update_ui()
 
     def _random_execute(self, cursor: cursor):
 

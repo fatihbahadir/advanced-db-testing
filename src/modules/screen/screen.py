@@ -32,13 +32,17 @@ class Screen(customtkinter.CTk):
             "increment_b_deadlock" : None,
             "set_a_average" : None,
             "set_b_average" : None,
-            "set_initial_params": None
+            "set_initial_params": None,
+            "remove_progress_bar": None,
         }
 
         self.main_page = MainPage(master=self)
         # Main Page
         self.form_page = FormPage(master=self, switch_frame_callback = self.switch_dashboard)
         self.form_page.pack(fill='both', expand=True)
+
+        # Bind Protocol
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def info(self):
         print("Screen Geometry HxW]: "+ self.geometry())
@@ -47,12 +51,14 @@ class Screen(customtkinter.CTk):
     def start(self):
         pass
 
-    def stop(self):
-        self.destroy()
-
     def switch_dashboard(self) -> None:
         self.form_page.pack_forget()
         self.main_page.pack(fill='both', expand=True)
+        self.resize_screen()
+    
+    def switch_form(self) -> None:
+        self.main_page.pack_forget()
+        self.form_page.pack(fill='both', expand=True)
         self.resize_screen()
 
     def _set_status(self, status: ScreenStatus) -> None:
@@ -64,3 +70,6 @@ class Screen(customtkinter.CTk):
 
     def set_callbacks(self, callbacks: dict):
         self.callbacks = callbacks
+  
+    def _on_close(self):
+        self.app.stop()

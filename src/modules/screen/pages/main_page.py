@@ -21,22 +21,22 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.b_average_count = 0
 
 
-        screen = self.find_screen()
+        self.screen = self.find_screen()
         
         self.form_data = {}
         
-        screen.set_callbacks(callbacks = {
+        self.screen.set_callbacks(callbacks = {
             "increment_a_completed": self.increment_a_completed,
             "increment_b_completed": self.increment_b_completed,
             "increment_a_deadlock": self.increment_a_deadlock,
             "increment_b_deadlock": self.increment_b_deadlock,
             "set_a_average": self.set_a_average,
             "set_b_average": self.set_b_average,
-            "set_initial_params": self.set_initial_params
-
+            "set_initial_params": self.set_initial_params,
+            "remove_progress_bar": self.remove_progress_bar
         })
 
-        self.data = screen.app.curr_simulation_meta
+        self.data = self.screen.app.form_data
  
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -75,6 +75,7 @@ class MainPage(customtkinter.CTkFrame, BasePage):
 
         self.progress_bar = CustomProgressBar(self)
         self.progress_bar.grid(row=7, column=0, columnspan=2, pady=20, padx=20, sticky="ew")
+
     
     def increment_a_completed(self):
         self.a_complete_amount += 1
@@ -102,3 +103,20 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.form_data = data
         self.completed_threads_info_a.set_value(f"0 / {self.form_data['a_amount']}")
         self.completed_threads_info_b.set_value(f"0 / {self.form_data['b_amount']}")
+    
+    def remove_progress_bar(self):
+        self.progress_bar.grid_remove()
+        self.add_buttons()
+    
+    def add_buttons(self):
+        self.save_button = customtkinter.CTkButton(self, text="Save Results", command=self.save_results)
+        self.save_button.grid(row=7, column=0, pady=20, padx=20, sticky="ew")
+
+        self.restart_button = customtkinter.CTkButton(self, text="Restart", command=self.restart)
+        self.restart_button.grid(row=7, column=1, pady=20, padx=20, sticky="ew")    
+    
+    def save_results(self):
+        print("Results saved!")
+
+    def restart(self):
+        self.screen.switch_form()
