@@ -93,10 +93,10 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.b_deadlock_amount += 1
         self.deadlocks_info_b.set_value(self.b_deadlock_amount)
 
-    def set_a_average(self):
+    def set_a_average(self, value: int):
         pass
 
-    def set_b_average(self):
+    def set_b_average(self, value: int):
         pass
 
     def set_initial_params(self, data: dict):
@@ -119,4 +119,12 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         print("Results saved!")
 
     def restart(self):
+        screen: "Screen" = self.master
+        screen.app.refresh()
+
+        self.a_complete_amount = 0
+        self.a_deadlock_amount = 0
+        self.b_complete_amount = 0
+        self.b_deadlock_amount = 0
+
         self.screen.switch_form()

@@ -1,7 +1,6 @@
 
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extensions import cursor
+import pyodbc
+from pyodbc import Cursor
 from threading import get_ident, Event
 from random import random
 import time
@@ -12,14 +11,13 @@ from services.db_connector import DbConnector
 class BWorkerManager(WorkerManager):
 
     def __init__(self, 
-                 worker_amount: int, 
-                 connection_params: dict,
+                 worker_amount: int,
                  increment_complete: callable,
                  increment_deadlock: callable,
                  set_average: callable) -> None:
-        super().__init__(worker_amount, connection_params, increment_complete, increment_deadlock, set_average)
+        super().__init__(worker_amount, increment_complete, increment_deadlock, set_average)
 
-        self.job_query = sql.SQL("""SELECT SUM(Sales.SalesOrderDetail.OrderQty)
+        self.job_query = """SELECT SUM(Sales.SalesOrderDetail.OrderQty)
                                 FROM Sales.SalesOrderDetail
                                 WHERE UnitPrice > 100
                                 AND EXISTS (SELECT * FROM Sales.SalesOrderHeader
@@ -27,7 +25,7 @@ class BWorkerManager(WorkerManager):
                                 Sales.SalesOrderDetail.SalesOrderID
                                 AND Sales.SalesOrderHeader.OrderDate
                                 BETWEEN @BeginDate AND @EndDate
-                                AND Sales.SalesOrderHeader.OnlineOrderFlag = 1)""")
+                                AND Sales.SalesOrderHeader.OnlineOrderFlag = 1)"""
 
     def job(self, stop_event: Event):
 
@@ -40,7 +38,7 @@ class BWorkerManager(WorkerManager):
 
             try:
                 self._random_execute(cursor)
-            except psycopg2.Error as e:
+            except pyodbc.Error as e:
                 self._logger.debug("DB error [worker#b]: " + e)
                 if e.args[0] == 40001 or "deadlock" in e.args[1].lower():
                     self._logger.warn(f"DB deadlock [worker#b] (thread::{get_ident()})")
@@ -54,7 +52,7 @@ class BWorkerManager(WorkerManager):
         
         self._update_ui()
 
-    def _random_execute(self, cursor: cursor):
+    def _random_execute(self, cursor: Cursor):
 
         if random() > 0.5:
             cursor.execute(self.job_query, ("20110101", "20111231"))

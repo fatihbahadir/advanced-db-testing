@@ -1,7 +1,6 @@
 
-import psycopg2
-from psycopg2.sql import SQL
-from psycopg2.extensions import connection, cursor
+import pyodbc
+from pyodbc import Connection, Cursor
 from threading import get_ident
 
 from typing import Tuple
@@ -14,7 +13,7 @@ class DbConnector:
     _user = None
     _password = None
     _host = None
-    _port = None
+    _conn_str = ""
 
     _logger = Logger(__name__).get_logger()
 
@@ -24,27 +23,22 @@ class DbConnector:
         cls._user = user
         cls._password = password
         cls._host = host
-        cls._port = port
+
+        cls._conn_str = cls._gen_conn_str()
 
     @classmethod
-    def connect(cls) -> Tuple[connection, cursor]:
+    def connect(cls) -> Tuple[Connection, Cursor]:
         try:
-            conn = psycopg2.connect(
-                dbname=cls._dbname,
-                user=cls._user,
-                password=cls._password,
-                host=cls._host,
-                port=cls._port
-            )
+            conn = pyodbc.connect(cls._conn_str)
             cursor = conn.cursor()
-        except psycopg2.Error as e:
+        except pyodbc.Error as e:
             cls._logger.error("DB connection error: " + str(e))
             raise
         cls._logger.debug(f"DB connected (thread::{get_ident()})")
         return conn, cursor
 
     @classmethod
-    def disconnect(cls, conn_data: Tuple[connection, cursor]) -> None:
+    def disconnect(cls, conn_data: Tuple[Connection, Cursor]) -> None:
         conn, cursor = conn_data
         if cursor:
             cursor.close()
@@ -55,7 +49,7 @@ class DbConnector:
         cls._logger.debug(f"DB disconnected (thread::{get_ident()})")
 
     @classmethod
-    def execute(cls, sql: SQL) -> any:
+    def execute(cls, sql: str) -> any:
         conn, cursor = cls.connect()
         
         cursor.execute(sql)
@@ -64,3 +58,7 @@ class DbConnector:
         cls.disconnect(conn, cursor)
         
         return result
+    
+    @classmethod
+    def _gen_conn_str(cls):
+        f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={cls.server};DATABASE={cls.database};UID={cls.username};PWD={cls.password}'

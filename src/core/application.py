@@ -2,7 +2,7 @@
 from datetime import datetime
 import time
 from random import random
-from threading import Event
+from threading import Event, get_ident
 
 from modules.screen.screen import Screen
 from modules.screen.enums import ScreenStatus
@@ -11,13 +11,19 @@ from core.app_logger import Logger
 from core.utils.thread_utils import StoppableThread
 
 from modules.worker.enums import TransactionIsolationLevel
+from modules.worker.worker_a import AWorkerManager
+from modules.worker.worker_b import BWorkerManager
 from services.db_connector import DbConnector
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from modules.screen.screen import Screen
 
 class App:
 
-    _instance = None
-    _screen = None
-    _database = None
+    _instance: "App" = None
+    _screen: "Screen" = None
 
     _is_app_running = False
     _app_status = None
@@ -29,8 +35,8 @@ class App:
 
     form_data = {}
 
-    a_worker_manager = None
-    b_worker_manager = None
+    a_worker_manager: AWorkerManager = None
+    b_worker_manager: BWorkerManager = None
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -69,6 +75,7 @@ class App:
 
         self._set_simulation_form_data(a_amount, b_amount, level, is_indexed)
         self._screen.callbacks["set_initial_params"](self.form_data)
+        
         self._screen.switch_dashboard()
 
         self._start_simulation()
@@ -76,6 +83,8 @@ class App:
     def refresh(self):
 
         self.form_data = {}
+
+        self._simulation_thread = None
 
         self.a_worker_manager = None
         self.b_worker_manager = None
@@ -91,7 +100,7 @@ class App:
         self._screen = Screen(app=self,
                               geometry="400x400",
                               title="Form")
-        self._app_cycle_thread = StoppableThread(target=self._run_cycle_thread, daemon=True)
+        self._app_cycle_thread = StoppableThread(target=self._run_cycle_thread)
         self._app_cycle_thread.start()
 
     def _run_cycle_thread(self, stop_event: Event):
@@ -137,28 +146,43 @@ class App:
         self._simulation_thread = StoppableThread(target=self._simulate)
         self._simulation_thread.start()
 
+    def _stop_simulation(self):
+
+        self._simulation_thread.stop()
+        self.a_worker_manager.stop()
+        self.b_worker_manager.stop()
+
+        self._app_status = ApplicationStatus.IDLE
+        self._screen._screen_status = ScreenStatus.IDLE
+        self._screen.callbacks["remove_progress_bar"]()
+
+        self._simulation_thread = None
+        
+        self.a_worker_manager = None
+        self.a_worker_manager = None
+
     def _simulate(self, stop_event: Event):
         
         self._app_status = ApplicationStatus.RUNNING
 
         ##### worker setup
-        for _ in range(10):
-
-            if stop_event.is_set(): break
-
-            self._screen.callbacks["increment_a_completed"]()
-            time.sleep(random()*3)
+        self._init_workers()
+        self.a_worker_manager.start()
+        self.b_worker_manager.start()
         #####
-
-        # This should remove the progressbar and add buttons
-        self._screen.callbacks["remove_progress_bar"]()
 
         self._stop_simulation()
 
-    def _stop_simulation(self):
+    def _init_workers(self):
+
+        self.a_worker_manager = AWorkerManager(
+            worker_amount=self.form_data["a_amount"],
+            increment_complete=self._screen.callbacks["increment_a_completed"],
+            increment_deadlock=self._screen.callbacks["increment_a_deadlock"],
+            set_average=self._screen.callbacks["set_a_average"])
         
-        self._simulation_thread = None
-
-        # self._screen.simulate_result()
-
-        self._app_status = ApplicationStatus.IDLE
+        self.b_worker_manager = BWorkerManager(
+            worker_amount=self.form_data["b_amount"],
+            increment_complete=self._screen.callbacks["increment_b_completed"],
+            increment_deadlock=self._screen.callbacks["increment_b_deadlock"],
+            set_average=self._screen.callbacks["set_b_average"])

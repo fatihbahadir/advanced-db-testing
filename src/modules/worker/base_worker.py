@@ -1,10 +1,7 @@
 
-import psycopg2
-from psycopg2.extensions import connection, cursor
-
 from abc import ABC, abstractmethod
 
-from typing import List, Tuple
+from typing import List
 
 from core.app_logger import Logger
 from core.utils.thread_utils import StoppableThread
@@ -33,12 +30,10 @@ class WorkerManager(IWorkerManager):
 
     def __init__(self, 
                  worker_amount: int,
-                 connection_params: dict,
                  increment_complete: callable,
                  increment_deadlock: callable,
                  set_average: callable) -> None:
         self.worker_amount = worker_amount
-        self.connection_params = connection_params
         self.increment_complete = increment_complete
         self.increment_deadlock = increment_deadlock
         self.set_average = set_average
@@ -65,6 +60,9 @@ class WorkerManager(IWorkerManager):
         if self._threads:
             for t in self._threads:
                 t.start()
+
+        for t in self._threads:
+            t.join()
 
     def stop(self):
         for t in self._threads:
