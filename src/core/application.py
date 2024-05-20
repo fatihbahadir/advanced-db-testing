@@ -2,7 +2,7 @@
 from datetime import datetime
 import time
 from random import random
-from threading import Event, get_ident
+from threading import Event, get_ident, Thread
 
 from modules.screen.screen import Screen
 from modules.screen.enums import ScreenStatus
@@ -37,6 +37,9 @@ class App:
 
     a_worker_manager: AWorkerManager = None
     b_worker_manager: BWorkerManager = None
+
+    a_manager_thread: Thread = None
+    b_manager_thread: Thread = None
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -101,7 +104,7 @@ class App:
             dbname="AdventureWorks2012",
             user="fatih",
             password="123456",
-            host="'HPPOMEN\SQLEXPRESS"
+            host="HPPOMEN\SQLEXPRESS"
         )
 
         self._screen = Screen(app=self,
@@ -168,15 +171,21 @@ class App:
         self.a_worker_manager = None
         self.a_worker_manager = None
 
+        self.a_manager_thread.join()
+        self.b_manager_thread.join()
+
+        self.a_manager_thread = None
+        self.b_manager_thread = None
+
     def _simulate(self, stop_event: Event):
         
         self._app_status = ApplicationStatus.RUNNING
 
-        ##### worker setup
         self._init_workers()
-        self.a_worker_manager.start()
-        self.b_worker_manager.start()
-        #####
+
+        self._start_workers()
+
+        self._wait_workers()
 
         self._stop_simulation()
 
@@ -193,3 +202,16 @@ class App:
             increment_complete=self._screen.callbacks["increment_b_completed"],
             increment_deadlock=self._screen.callbacks["increment_b_deadlock"],
             set_average=self._screen.callbacks["set_b_average"])
+
+    def _start_workers(self):
+        
+        self.a_manager_thread = Thread(target=self.a_worker_manager.start)
+        self.b_manager_thread = Thread(target=self.b_worker_manager.start)
+
+        self.a_manager_thread.start()
+        self.b_manager_thread.start()
+
+    def _wait_workers(self):
+        while (not self.a_worker_manager.is_completed and 
+            not self.b_worker_manager.is_completed):
+            time.sleep(0.3)

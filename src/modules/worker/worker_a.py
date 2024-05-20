@@ -28,23 +28,27 @@ class AWorkerManager(WorkerManager):
                             BETWEEN @BeginDate AND @EndDate
                             AND Sales.SalesOrderHeader.OnlineOrderFlag = 1)"""
     
-    def job(self, stop_event: Event):
+    def job(self):
 
         _start_time = time.time()
 
-        for _ in range(100):
-            if (stop_event.is_set()): break
+        for _ in range(10):
 
             conn, cursor = DbConnector.connect()
             try:
                 self._random_execute(cursor)
+                print(f"Exec res ~ (thread:{get_ident()}) [{self.__class__.__name__}]")
             except pyodbc.Error as e:
-                self._logger.debug("DB error [worker#a]: " + e)
+                self._logger.debug("DB error [worker#a]: " + str(e))
                 if e.args[0] == 40001 or "deadlock" in e.args[1].lower():
-                    self._logger.warn(f"DB deadlock [worker#a] (thread::{get_ident()})")
+                    print("Deadlock ~")
+                    print(f"Deadlock ~ (thread:{get_ident()})")
+                    self._logger.warn(f"DB deadlock [worker#a] (thread::{get_ident()}) [{self.__class__.__name__}]")
             
                     self._deadlock_occurred()
-            
+            except Exception as e:
+                print(f"Anything ~ (thread:{get_ident()}) [{self.__class__.__name__}]")
+                
             DbConnector.disconnect(conn_data=(conn, cursor))
 
         _end_time = time.time()
