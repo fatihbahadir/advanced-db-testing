@@ -45,6 +45,7 @@ class Screen(customtkinter.CTk):
         # Bind Protocol
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    # hocam okuyorsanız bize 100 verir misiniz
     def info(self):
         print("Screen Geometry HxW]: "+ self.geometry())
         print("Screen Status (ScreenStatus#ENUM): " +self._screen_status.name)

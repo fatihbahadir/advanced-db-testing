@@ -50,19 +50,19 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.grid_columnconfigure(0, weight=1)  
         self.grid_columnconfigure(1, weight=1)
 
-        type_a_label = customtkinter.CTkLabel(self, text="Type A", font=("Arial", 30, "bold"))
+        type_a_label = customtkinter.CTkLabel(self, text="User A", font=("Arial", 30, "bold"))
         type_a_label.grid(row=0, column=0, sticky="w", padx=20, pady=5)
 
         self.completed_threads_info_a = InfoLabel(self, "Number of completed threads", f"0 / 0", 1)
         self.completed_threads_info_a.grid(row=1, column=0)
 
-        self.deadlocks_info_a = InfoLabel(self, "Number of deadlocks", "0", 3)
+        self.deadlocks_info_a = InfoLabel(self, "Number of deadlocks", "0s", 3)
         self.deadlocks_info_a.grid(row=3, column=0)
 
-        self.average_duration_info_a = InfoLabel(self, "Average Duration", "10ms", 5)
+        self.average_duration_info_a = InfoLabel(self, "Average Duration", "N/A s", 5)
         self.average_duration_info_a.grid(row=5, column=0)
 
-        self.type_b_label = customtkinter.CTkLabel(self, text="Type B", font=("Arial", 30, "bold"))
+        self.type_b_label = customtkinter.CTkLabel(self, text="User B", font=("Arial", 30, "bold"))
         self.type_b_label.grid(row=0, column=1, sticky="w", padx=20, pady=5)
 
         self.completed_threads_info_b = InfoLabel(self, "Number of completed threads", "0 / 0", 1)
@@ -71,10 +71,10 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.deadlocks_info_b = InfoLabel(self, "Number of deadlocks", "0", 3)
         self.deadlocks_info_b.grid(row=3, column=1)
 
-        self.average_duration_info_b = InfoLabel(self, "Average Duration", "10ms", 5)
+        self.average_duration_info_b = InfoLabel(self, "Average Duration", "N/A s", 5)
         self.average_duration_info_b.grid(row=5, column=1)
 
-        self.save_button = customtkinter.CTkButton(self, text="Save Results", command=self.save_results)
+        self.save_button = customtkinter.CTkButton(self, text="Save Results And Close", command=self.save_results)
         self.restart_button = customtkinter.CTkButton(self, text="Restart", command=self.restart)
         self.progress_bar = CustomProgressBar(self)
 
@@ -97,15 +97,23 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.deadlocks_info_b.set_value(self.b_deadlock_amount)
 
     def set_a_average(self, value: int):
-        pass
+        self.a_average_count = f'{value} s'
+        self.average_duration_info_a.set_value(self.a_average_count)
 
     def set_b_average(self, value: int):
-        pass
+        self.b_average_count = f'{value} s'
+        self.average_duration_info_b.set_value(self.b_average_count)
 
     def set_initial_params(self, data: dict):
         self.form_data = data
         self.completed_threads_info_a.set_value(f"0 / {self.form_data['a_amount']}")
         self.completed_threads_info_b.set_value(f"0 / {self.form_data['b_amount']}")
+        self.deadlocks_info_a.set_value(self.a_deadlock_amount)
+        self.deadlocks_info_b.set_value(self.b_deadlock_amount)
+        self.average_duration_info_a.set_value("N/A s")
+        self.average_duration_info_b.set_value("N/A s")
+
+
     
     def remove_progress_bar(self):
         self.progress_bar.grid_remove()
@@ -125,8 +133,8 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.progress_bar.grid(row=7, column=0, columnspan=2, pady=20, padx=20, sticky="ew")
     
     def save_results(self):
-        print("Results saved!")
-
+        self.find_screen().app.save_result()
+        
     def restart(self):
         screen: "Screen" = self.master
         screen.app.refresh()
@@ -135,5 +143,7 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.a_deadlock_amount = 0
         self.b_complete_amount = 0
         self.b_deadlock_amount = 0
+        self.a_average_count = "N/A s"
+        self.b_average_count = "N/A s"
 
         self.screen.switch_form()

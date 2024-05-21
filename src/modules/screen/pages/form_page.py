@@ -29,7 +29,7 @@ class FormPage(customtkinter.CTkFrame, BasePage):
 
         self.checkbox = CheckBoxField(
             self, 
-            label_text="Create Index", 
+            label_text="Create / Drop Index", 
             variable=self.has_index, 
             onvalue="True", 
             offvalue="False"

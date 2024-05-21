@@ -5,6 +5,8 @@ from typing import List
 from core.app_logger import Logger
 # from core.utils.thread_utils import StoppableThread
 
+from modules.worker.enums import TransactionIsolationLevel
+
 class IWorkerManager(ABC):
 
     @abstractmethod
@@ -31,16 +33,20 @@ class WorkerManager(IWorkerManager):
                  worker_amount: int,
                  increment_complete: callable,
                  increment_deadlock: callable,
-                 set_average: callable) -> None:
+                 set_average: callable,
+                 isolation_level: TransactionIsolationLevel) -> None:
         self.worker_amount = worker_amount
         self.increment_complete = increment_complete
         self.increment_deadlock = increment_deadlock
         self.set_average = set_average
+        self.isolation_level = isolation_level
 
         self._threads: List[Thread] = []
 
         self.total_elapsed_time_per_worker: float = 0.0
+        self.number_of_completed = 0
         self.number_of_deadlocks = 0
+        self.average_elapsed = 0
 
         self.job_query = None
 
@@ -87,9 +93,11 @@ class WorkerManager(IWorkerManager):
         self._logger.debug("self._threads cleared")
 
     def _update_ui(self):
-        self.set_average(round(self.total_elapsed_time_per_worker / self.worker_amount, 2))
+        self.number_of_completed += 1
+        self.average_elapsed = self.total_elapsed_time_per_worker / self.number_of_completed
+        self.set_average(round(self.average_elapsed, 2))
         self.increment_complete()
-        self._logger.debug("UI updated")
+        self._logger.debug(f"UI updated: number_of_completed={self.number_of_completed}, total_elapsed_time_per_worker={self.total_elapsed_time_per_worker}, average_elapsed={self.average_elapsed}")
 
     def _deadlock_occured(self):
         self.number_of_deadlocks += 1

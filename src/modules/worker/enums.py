@@ -4,7 +4,7 @@ from enum import Enum
 class TransactionIsolationLevel(Enum):
     
     READ_UNCOMMITTED = "read uncommitted"
-    READ_COMMITED = "read commited"
+    READ_COMMITTED = "read committed"
     REPEATABLE_READ = "repeatable read"
     SERIALIZABLE = "serializable"
 

@@ -14,6 +14,7 @@ from modules.worker.enums import TransactionIsolationLevel
 from modules.worker.worker_a import AWorkerManager
 from modules.worker.worker_b import BWorkerManager
 from services.db_connector import DbConnector
+from services.file_service import FileService
 
 from typing import TYPE_CHECKING
 
@@ -40,6 +41,8 @@ class App:
 
     a_manager_thread: Thread = None
     b_manager_thread: Thread = None
+
+    _last_result = {}
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -69,6 +72,7 @@ class App:
         self._logger.info("$ ------------------------ > #\n")
 
     def start_simulation(self, a_amount: int, b_amount: int, level: TransactionIsolationLevel, is_indexed: bool):
+        
         if self._app_status != ApplicationStatus.IDLE:
             self._logger.warn("App status must be IDLE to start simulation. current: " + self._app_status.name)
             return
@@ -81,6 +85,11 @@ class App:
         
         self._screen.switch_dashboard()
 
+        if (self.form_data["is_indexed"]):
+            DbConnector.create_index()
+        else:
+            DbConnector.drop_index()
+
         self._start_simulation()
 
     def refresh(self):
@@ -91,6 +100,22 @@ class App:
 
         self.a_worker_manager = None
         self.b_worker_manager = None
+
+    def save_result(self):
+
+        data = {"transaction_level": self.form_data["level"].name,
+                "has_index": self.form_data["is_indexed"],
+                "num_of_a_users": self.form_data["a_amount"],
+                "num_of_b_users": self.form_data["b_amount"]}
+        data.update(self._last_result)
+
+        print(" Save Data ".center(50, "*"))
+        print(data)
+        print(61*"*")
+
+        FileService.save_result(data)
+
+        self.stop()
 
     def panic(self):
         self._logger.warn("System panicked!!")
@@ -187,6 +212,18 @@ class App:
 
         self._wait_workers()
 
+        self._last_result = {
+            "a_deadlock": self.a_worker_manager.number_of_deadlocks,
+            "a_average": self.a_worker_manager.average_elapsed,
+            "b_deadlock": self.b_worker_manager.number_of_deadlocks,
+            "b_average": self.b_worker_manager.average_elapsed
+        }
+        self._logger.debug(f"Simulation results: {self._last_result}")
+        
+        print(" Last Result ".center(50, "*"))
+        print(self._last_result)
+        print(63*"*")
+
         self._stop_simulation()
 
     def _init_workers(self):
@@ -195,13 +232,15 @@ class App:
             worker_amount=self.form_data["a_amount"],
             increment_complete=self._screen.callbacks["increment_a_completed"],
             increment_deadlock=self._screen.callbacks["increment_a_deadlock"],
-            set_average=self._screen.callbacks["set_a_average"])
+            set_average=self._screen.callbacks["set_a_average"],
+            isolation_level=self.form_data["level"])
         
         self.b_worker_manager = BWorkerManager(
             worker_amount=self.form_data["b_amount"],
             increment_complete=self._screen.callbacks["increment_b_completed"],
             increment_deadlock=self._screen.callbacks["increment_b_deadlock"],
-            set_average=self._screen.callbacks["set_b_average"])
+            set_average=self._screen.callbacks["set_b_average"],
+            isolation_level=self.form_data["level"])
 
     def _start_workers(self):
         
