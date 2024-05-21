@@ -33,7 +33,8 @@ class MainPage(customtkinter.CTkFrame, BasePage):
             "set_a_average": self.set_a_average,
             "set_b_average": self.set_b_average,
             "set_initial_params": self.set_initial_params,
-            "remove_progress_bar": self.remove_progress_bar
+            "remove_progress_bar": self.remove_progress_bar,
+            "remove_buttons": self.remove_buttons
         })
 
         self.data = self.screen.app.form_data
@@ -73,8 +74,10 @@ class MainPage(customtkinter.CTkFrame, BasePage):
         self.average_duration_info_b = InfoLabel(self, "Average Duration", "10ms", 5)
         self.average_duration_info_b.grid(row=5, column=1)
 
+        self.save_button = customtkinter.CTkButton(self, text="Save Results", command=self.save_results)
+        self.restart_button = customtkinter.CTkButton(self, text="Restart", command=self.restart)
         self.progress_bar = CustomProgressBar(self)
-        self.progress_bar.grid(row=7, column=0, columnspan=2, pady=20, padx=20, sticky="ew")
+
 
     
     def increment_a_completed(self):
@@ -107,13 +110,19 @@ class MainPage(customtkinter.CTkFrame, BasePage):
     def remove_progress_bar(self):
         self.progress_bar.grid_remove()
         self.add_buttons()
+
+    def remove_buttons(self):
+        
+        self.save_button.grid_remove()
+        self.restart_button.grid_remove()
+        self.add_progress_bar()
     
     def add_buttons(self):
-        self.save_button = customtkinter.CTkButton(self, text="Save Results", command=self.save_results)
         self.save_button.grid(row=7, column=0, pady=20, padx=20, sticky="ew")
-
-        self.restart_button = customtkinter.CTkButton(self, text="Restart", command=self.restart)
         self.restart_button.grid(row=7, column=1, pady=20, padx=20, sticky="ew")    
+    
+    def add_progress_bar(self):
+        self.progress_bar.grid(row=7, column=0, columnspan=2, pady=20, padx=20, sticky="ew")
     
     def save_results(self):
         print("Results saved!")

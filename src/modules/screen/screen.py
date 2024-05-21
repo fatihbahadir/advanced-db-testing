@@ -34,6 +34,7 @@ class Screen(customtkinter.CTk):
             "set_b_average" : None,
             "set_initial_params": None,
             "remove_progress_bar": None,
+            "remove_buttons": None,
         }
 
         self.main_page = MainPage(master=self)
@@ -54,6 +55,7 @@ class Screen(customtkinter.CTk):
     def switch_dashboard(self) -> None:
         self.form_page.pack_forget()
         self.main_page.pack(fill='both', expand=True)
+        self.callbacks["remove_buttons"]()
         self.resize_screen()
     
     def switch_form(self) -> None:
