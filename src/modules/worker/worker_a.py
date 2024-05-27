@@ -30,7 +30,7 @@ class AWorkerManager(WorkerManager):
     
     def job(self):
         _start_time = time.time()
-        for index in range(10):
+        for index in range(100):
 
             print(f"A-Worker Thread({get_ident()}) ~ Job :: {index + 1}")
 
